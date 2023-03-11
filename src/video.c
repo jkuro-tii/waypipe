@@ -375,12 +375,11 @@ static int setup_vaapi_pipeline(struct shadow_fd *sfd, struct render_data *rd,
 
 static void cleanup_vaapi_pipeline(struct shadow_fd *sfd)
 {
-	if (!sfd->video_context) {
+	if (!sfd->video_va_surface && !sfd->video_va_context &&
+			!sfd->video_va_pipeline) {
 		return;
 	}
-	if (!sfd->video_context->hw_device_ctx) {
-		return;
-	}
+
 	AVHWDeviceContext *vwdc =
 			(AVHWDeviceContext *)
 					sfd->video_context->hw_device_ctx->data;
