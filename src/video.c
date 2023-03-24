@@ -852,6 +852,12 @@ fail_alignment:
 
 int setup_video_encode(struct shadow_fd *sfd, struct render_data *rd)
 {
+	if (sfd->video_context) {
+		wp_error("Video context already set up for sfd RID=%d",
+				sfd->remote_id);
+		return -1;
+	}
+
 	bool has_hw = init_hwcontext(rd) == 0;
 	/* Attempt hardware encoding, and if it doesn't succeed, fall back
 	 * to software encoding */
