@@ -271,7 +271,7 @@ static int interpret_chanmsg(struct chan_msg_state *cmsg,
 		}
 	} else if (type == WMSG_RESTART) {
 		struct wmsg_restart *ackm = (struct wmsg_restart *)packet;
-		wp_debug("Received restart message: remote last saw ack %d (we last recvd %d, acked %d)",
+		wp_debug("Received WMSG_RESTART: remote last saw ack %d (we last recvd %d, acked %d)",
 				ackm->last_ack_received,
 				cxs->last_received_msgno,
 				cxs->last_acked_msgno);
@@ -279,6 +279,8 @@ static int interpret_chanmsg(struct chan_msg_state *cmsg,
 		return 0;
 	} else if (type == WMSG_ACK_NBLOCKS) {
 		struct wmsg_ack *ackm = (struct wmsg_ack *)packet;
+		wp_debug("Received WMSG_ACK_NBLOCKS: remote recvd %u",
+				ackm->messages_received);
 		if (msgno_gt(ackm->messages_received,
 				    cxs->last_received_msgno)) {
 			cxs->last_confirmed_msgno = ackm->messages_received;
@@ -301,6 +303,7 @@ static int interpret_chanmsg(struct chan_msg_state *cmsg,
 		const int32_t *fds = &((const int32_t *)packet)[1];
 		int nfds = (int)((unpadded_size - sizeof(uint32_t)) /
 				 sizeof(int32_t));
+		wp_debug("Received WMSG_INJECT_RIDS with %d fds", nfds);
 
 		if (buf_ensure_size(nfds, sizeof(int), &cmsg->transf_fds.size,
 				    (void **)&cmsg->transf_fds.data) == -1) {
@@ -333,6 +336,8 @@ static int interpret_chanmsg(struct chan_msg_state *cmsg,
 		 * guaranteed that all file descriptors provided will be used by
 		 * the messages. This makes fd handling more complicated. */
 		int protosize = (int)(unpadded_size - sizeof(uint32_t));
+		wp_debug("Received WMSG_PROTOCOL with %d bytes of messages",
+				protosize);
 		// TODO: have message editing routines ensure size, so
 		// that this limit can be tighter
 		if (buf_ensure_size(protosize + 1024, 1,
