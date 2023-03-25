@@ -282,7 +282,7 @@ static int interpret_chanmsg(struct chan_msg_state *cmsg,
 		wp_debug("Received WMSG_ACK_NBLOCKS: remote recvd %u",
 				ackm->messages_received);
 		if (msgno_gt(ackm->messages_received,
-				    cxs->last_received_msgno)) {
+				    cxs->last_confirmed_msgno)) {
 			cxs->last_confirmed_msgno = ackm->messages_received;
 		}
 		return 0;
