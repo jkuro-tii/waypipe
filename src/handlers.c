@@ -618,6 +618,28 @@ int get_shm_bytes_per_pixel(uint32_t format)
 	case WL_SHM_FORMAT_ARGB16161616:
 	case WL_SHM_FORMAT_ABGR16161616:
 		return 8;
+	// todo: adjust API to handle bit packed formats
+	case WL_SHM_FORMAT_C1:
+	case WL_SHM_FORMAT_C2:
+	case WL_SHM_FORMAT_C4:
+	case WL_SHM_FORMAT_D1:
+	case WL_SHM_FORMAT_D2:
+	case WL_SHM_FORMAT_D4:
+		goto planar;
+	case WL_SHM_FORMAT_D8:
+		return 1;
+	case WL_SHM_FORMAT_R1:
+	case WL_SHM_FORMAT_R2:
+	case WL_SHM_FORMAT_R4:
+		goto planar;
+	case WL_SHM_FORMAT_R10:
+	case WL_SHM_FORMAT_R12:
+		return 2;
+	case WL_SHM_FORMAT_AVUY8888:
+	case WL_SHM_FORMAT_XVUY8888:
+		return 4;
+	case WL_SHM_FORMAT_P030:
+		goto planar;
 	default:
 		wp_error("Unidentified WL_SHM format %x", format);
 		return -1;
