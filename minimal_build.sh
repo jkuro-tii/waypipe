@@ -18,7 +18,7 @@ python3 ../protocols/symgen.py header ../protocols/function_list.txt protocols.h
 echo '#define WAYPIPE_VERSION "minimal"' > config-waypipe.h
 
 echo "Compiling..."
-gcc -D_DEFAULT_SOURCE -I. -I../protocols/ -lpthread -o waypipe protocols.c \
+gcc -D_DEFAULT_SOURCE -Os -I. -I../protocols/ -lpthread -o waypipe protocols.c \
     ../src/bench.c ../src/client.c ../src/dmabuf.c ../src/handlers.c \
     ../src/interval.c ../src/kernel.c ../src/mainloop.c ../src/parsing.c \
     ../src/platform.c ../src/server.c ../src/shadow.c ../src/util.c \
