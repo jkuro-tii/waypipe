@@ -2311,6 +2311,16 @@ void mark_pipe_object_statuses(
 		if (pfds[i].revents & POLLOUT) {
 			sfd->pipe.writable = true;
 		}
+		if (pfds[i].revents & POLLERR) {
+			wp_debug("Pipe poll returned POLLERR for .pipe_fd=%d, closing",
+					lfd);
+			if (sfd->pipe.can_read) {
+				pipe_close_read(sfd);
+			}
+			if (sfd->pipe.can_write) {
+				pipe_close_write(sfd);
+			}
+		}
 	}
 }
 
