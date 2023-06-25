@@ -370,8 +370,11 @@ struct wmsg_open_dmabuf {
 };
 static_assert(sizeof(struct wmsg_open_dmabuf) == 12, "size check");
 
-#define DMAVID_H264 0x00
-#define DMAVID_VP9 0x01
+enum video_coding_fmt {
+	VIDEO_H264 = 0,
+	VIDEO_VP9 = 1,
+};
+
 struct wmsg_open_dmavid {
 	uint32_t size_and_type;
 	int32_t remote_id;

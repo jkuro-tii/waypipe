@@ -1144,7 +1144,7 @@ static void add_dmabuf_create_request_v2(struct transfer_queue *transfers,
 	header->file_size = (uint32_t)sfd->buffer_size;
 	header->remote_id = sfd->remote_id;
 	header->size_and_type = transfer_header(actual_len, variant);
-	header->vid_flags = (fmt == VIDEO_H264) ? DMAVID_H264 : DMAVID_VP9;
+	header->vid_flags = (uint32_t)fmt;
 
 	memcpy(data + sizeof(*header), &sfd->dmabuf_info,
 			sizeof(struct dmabuf_slice_data));
@@ -1696,14 +1696,15 @@ int apply_update(struct fd_translation_map *map, struct thread_pool *threads,
 			memcpy(&sfd->dmabuf_info,
 					msg->data + sizeof(struct wmsg_open_dmavid),
 					sizeof(struct dmabuf_slice_data));
-			if ((header.vid_flags & 0xff) == DMAVID_H264) {
-				sfd->video_fmt = VIDEO_H264;
-			} else if ((header.vid_flags & 0xff) == DMAVID_VP9) {
-				sfd->video_fmt = VIDEO_VP9;
+			uint32_t vid_type = header.vid_flags & 0xff;
+			if (vid_type == (uint32_t)VIDEO_H264 ||
+					vid_type == (uint32_t)VIDEO_VP9) {
+				sfd->video_fmt =
+						(enum video_coding_fmt)vid_type;
 			} else {
 				sfd->video_fmt = VIDEO_H264;
-				wp_error("Unidentified video format for RID=%d",
-						sfd->remote_id);
+				wp_error("Unidentified video format %u for RID=%d",
+						vid_type, sfd->remote_id);
 				return 0;
 			}
 		}
@@ -1765,13 +1766,14 @@ int apply_update(struct fd_translation_map *map, struct thread_pool *threads,
 			memcpy(&sfd->dmabuf_info,
 					msg->data + sizeof(struct wmsg_open_dmavid),
 					sizeof(struct dmabuf_slice_data));
-			if ((header.vid_flags & 0xff) == DMAVID_H264) {
-				sfd->video_fmt = VIDEO_H264;
-			} else if ((header.vid_flags & 0xff) == DMAVID_VP9) {
-				sfd->video_fmt = VIDEO_VP9;
+			uint32_t vid_type = header.vid_flags & 0xff;
+			if (vid_type == (uint32_t)VIDEO_H264 ||
+					vid_type == (uint32_t)VIDEO_VP9) {
+				sfd->video_fmt =
+						(enum video_coding_fmt)vid_type;
 			} else {
 				sfd->video_fmt = VIDEO_H264;
-				wp_error("Unidentified video format for RID=%d",
+				wp_error("Unidentified video format %u for RID=%d",
 						sfd->remote_id);
 				return 0;
 			}

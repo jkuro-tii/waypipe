@@ -175,11 +175,6 @@ struct pipe_state {
 	bool pending_w_shutdown;
 };
 
-enum video_coding_fmt {
-	VIDEO_H264,
-	VIDEO_VP9,
-};
-
 /**
  * @brief The shadow_fd struct
  *
