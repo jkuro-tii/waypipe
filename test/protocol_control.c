@@ -935,7 +935,7 @@ int main(int argc, char **argv)
 
 	set_initial_fds();
 
-	int ntest = 20;
+	int ntest = 21;
 	int nsuccess = 0;
 	nsuccess += test_fixed_shm_buffer_copy();
 	nsuccess += test_fixed_shm_screencopy_copy();
@@ -957,6 +957,7 @@ int main(int argc, char **argv)
 	nsuccess += test_fixed_video_color_copy(VIDEO_H264, false);
 	nsuccess += test_fixed_video_color_copy(VIDEO_H264, true);
 	nsuccess += test_fixed_video_color_copy(VIDEO_VP9, false);
+	nsuccess += test_fixed_video_color_copy(VIDEO_AV1, false);
 	// TODO: add tests for handling of common errors, e.g. invalid fd,
 	// or type confusion
 

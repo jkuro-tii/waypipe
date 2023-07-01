@@ -202,6 +202,7 @@ size_t print_wrapped_error(char *dest, size_t dest_space, const char *message);
 #define CONN_NO_VIDEO (0x1u << 11)
 #define CONN_VP9_VIDEO (0x2u << 11)
 #define CONN_H264_VIDEO (0x3u << 11)
+#define CONN_AV1_VIDEO (0x4u << 11)
 
 struct connection_token {
 	/** Indicate protocol version (top 16 bits), endianness, and
@@ -373,6 +374,7 @@ static_assert(sizeof(struct wmsg_open_dmabuf) == 12, "size check");
 enum video_coding_fmt {
 	VIDEO_H264 = 0,
 	VIDEO_VP9 = 1,
+	VIDEO_AV1 = 2,
 };
 
 struct wmsg_open_dmavid {

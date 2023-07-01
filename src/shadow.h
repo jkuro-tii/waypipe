@@ -267,7 +267,8 @@ const char *fdcat_to_str(enum fdcat cat);
  * warn and disable replication features.
  **/
 struct shadow_fd *translate_fd(struct fd_translation_map *map,
-		struct render_data *render, int fd, enum fdcat type, size_t sz,
+		struct render_data *render, struct thread_pool *threads, int fd,
+		enum fdcat type, size_t sz,
 		const struct dmabuf_slice_data *info, bool force_pipe_iw);
 /** Given a struct shadow_fd, produce some number of corresponding file update
  * transfer messages. All pointers will be to existing memory. */
@@ -358,7 +359,8 @@ bool video_supports_coding_format(enum video_coding_fmt fmt);
 void setup_video_logging(void);
 void destroy_video_data(struct shadow_fd *sfd);
 /** These need to have the dmabuf/dmabuf_info set beforehand */
-int setup_video_encode(struct shadow_fd *sfd, struct render_data *rd);
+int setup_video_encode(
+		struct shadow_fd *sfd, struct render_data *rd, int nthreads);
 int setup_video_decode(struct shadow_fd *sfd, struct render_data *rd);
 /** the video frame to be transferred should already have been transferred into
  * `sfd->mem_mirror`. */

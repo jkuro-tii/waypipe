@@ -127,6 +127,17 @@ static int check_conn_header(uint32_t header, const struct main_config *config,
 					"Waypipe client is rejecting connection, Waypipe client was not configured for the VP9 video coding format requested by the Waypipe server");
 			return -1;
 		}
+	} else if ((header & CONN_VIDEO_MASK) == CONN_AV1_VIDEO) {
+		if (!config->video_if_possible) {
+			snprintf(err, err_size,
+					"Waypipe client is rejecting connection, Waypipe client was not run with video encoding enabled, unlike Waypipe server");
+			return -1;
+		}
+		if (config->video_fmt != VIDEO_AV1) {
+			snprintf(err, err_size,
+					"Waypipe client is rejecting connection, Waypipe client was not configured for the AV1 video coding format requested by the Waypipe server");
+			return -1;
+		}
 	} else if ((header & CONN_VIDEO_MASK) == CONN_NO_VIDEO) {
 		if (config->video_if_possible) {
 			snprintf(err, err_size,

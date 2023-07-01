@@ -138,8 +138,8 @@ static ssize_t iovec_write(int conn, const char *buf, size_t buflen,
 }
 
 static int translate_fds(struct fd_translation_map *map,
-		struct render_data *render, int nfds, const int fds[],
-		int ids[])
+		struct render_data *render, struct thread_pool *threads,
+		int nfds, const int fds[], int ids[])
 {
 	for (int i = 0; i < nfds; i++) {
 		struct shadow_fd *sfd = get_shadow_for_local_fd(map, fds[i]);
@@ -147,8 +147,8 @@ static int translate_fds(struct fd_translation_map *map,
 			/* Autodetect type + create shadow fd */
 			size_t fdsz = 0;
 			enum fdcat fdtype = get_fd_type(fds[i], &fdsz);
-			sfd = translate_fd(map, render, fds[i], fdtype, fdsz,
-					NULL, false);
+			sfd = translate_fd(map, render, threads, fds[i], fdtype,
+					fdsz, NULL, false);
 		}
 		if (sfd) {
 			ids[i] = sfd->remote_id;
@@ -967,7 +967,7 @@ static int advance_waymsg_progread(struct way_msg_state *wmsg,
 			int32_t *rbuffer = (int32_t *)(msg + 1);
 
 			/* Translate and adjust refcounts */
-			if (translate_fds(&g->map, &g->render,
+			if (translate_fds(&g->map, &g->render, &g->threads,
 					    wmsg->fds.zone_start,
 					    wmsg->fds.data, rbuffer) == -1) {
 				free(msg);

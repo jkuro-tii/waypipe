@@ -94,7 +94,7 @@ static const char usage_string[] =
 		"      --threads T      set thread pool size, default=hardware threads/2\n"
 		"      --unlink-socket  server: unlink the socket that waypipe connects to\n"
 		"      --video[=V]      compress certain linear dmabufs only with a video codec\n"
-		"                         V is list of options: sw,hw,bpf=1.2e5,h264,vp9\n"
+		"                         V is list of options: sw,hw,bpf=1.2e5,h264,vp9,av1\n"
 		"\n";
 
 static int usage(int retcode)
@@ -324,6 +324,8 @@ static int parse_video_string(const char *str, struct main_config *config)
 			config->video_fmt = VIDEO_H264;
 		} else if (!strcmp(part, "vp9")) {
 			config->video_fmt = VIDEO_VP9;
+		} else if (!strcmp(part, "av1")) {
+			config->video_fmt = VIDEO_AV1;
 		} else if (!strcmp(part, "hw")) {
 			config->prefer_hwvideo = true;
 		} else if (!strcmp(part, "sw")) {
@@ -956,11 +958,22 @@ int main(int argc, char **argv)
 			}
 			if (config.video_if_possible) {
 				if (!config.old_video_mode) {
+					char *vid_type = NULL;
+					switch (config.video_fmt) {
+					case VIDEO_H264:
+						vid_type = "h264";
+						break;
+					case VIDEO_VP9:
+						vid_type = "vp9";
+						break;
+					case VIDEO_AV1:
+						vid_type = "av1";
+						break;
+					}
+
 					sprintf(video_str,
 							"--video=%s,%s,bpf=%d",
-							config.video_fmt == VIDEO_H264
-									? "h264"
-									: "vp9",
+							vid_type,
 							config.prefer_hwvideo
 									? "hw"
 									: "sw",

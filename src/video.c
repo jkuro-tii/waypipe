@@ -46,10 +46,12 @@ bool video_supports_coding_format(enum video_coding_fmt fmt)
 }
 void cleanup_hwcontext(struct render_data *rd) { (void)rd; }
 void destroy_video_data(struct shadow_fd *sfd) { (void)sfd; }
-int setup_video_encode(struct shadow_fd *sfd, struct render_data *rd)
+int setup_video_encode(
+		struct shadow_fd *sfd, struct render_data *rd, int nthreads)
 {
 	(void)sfd;
 	(void)rd;
+	(void)nthreads;
 	return -1;
 }
 int setup_video_decode(struct shadow_fd *sfd, struct render_data *rd)
@@ -100,6 +102,17 @@ void apply_video_packet(struct shadow_fd *sfd, struct render_data *rd,
 #define VIDEO_VP9_HW_ENCODER "vp9_vaapi"
 #define VIDEO_VP9_SW_ENCODER "libvpx-vp9"
 #define VIDEO_VP9_DECODER "vp9"
+
+/* librav1e currently is not sufficient as its low-latency mode doesn't
+ * appear to entirely turn off lookahead, and a few frames of latency
+ * are unavoidable; this may be fixed in the future.
+ *
+ * libsvtav1 -- might work, if suitable controls for zero latency can be found
+ *
+ * libaom-av1 -- works, but may be slower than the other options */
+// #define VIDEO_AV1_SW_ENCODER "libsvtav1"
+#define VIDEO_AV1_SW_ENCODER "libaom-av1"
+#define VIDEO_AV1_DECODER "libdav1d"
 
 static enum AVPixelFormat drm_to_av(uint32_t format)
 {
@@ -211,21 +224,98 @@ bool video_supports_shm_format(uint32_t format)
 	return video_supports_dmabuf_format(format, 0);
 }
 
+static const struct AVCodec *get_video_sw_encoder(
+		enum video_coding_fmt fmt, bool print_error)
+{
+	const struct AVCodec *codec = NULL;
+	switch (fmt) {
+	case VIDEO_H264:
+		codec = avcodec_find_encoder_by_name(VIDEO_H264_SW_ENCODER);
+		if (!codec && print_error) {
+			wp_error("Failed to find encoder \"%s\"",
+					VIDEO_H264_SW_ENCODER);
+		}
+		return codec;
+	case VIDEO_VP9:
+		codec = avcodec_find_encoder_by_name(VIDEO_VP9_SW_ENCODER);
+		if (!codec && print_error) {
+			wp_error("Failed to find encoder \"%s\"",
+					VIDEO_VP9_SW_ENCODER);
+		}
+		return codec;
+	case VIDEO_AV1:
+		codec = avcodec_find_encoder_by_name(VIDEO_AV1_SW_ENCODER);
+		if (!codec && print_error) {
+			wp_error("Failed to find encoder \"%s\"",
+					VIDEO_AV1_SW_ENCODER);
+		}
+		return codec;
+	default:
+		return NULL;
+	}
+}
+
+static const struct AVCodec *get_video_hw_encoder(
+		enum video_coding_fmt fmt, bool print_error)
+{
+	const struct AVCodec *codec = NULL;
+	switch (fmt) {
+	case VIDEO_H264:
+		codec = avcodec_find_encoder_by_name(VIDEO_H264_HW_ENCODER);
+		if (!codec && print_error) {
+			wp_error("Failed to find encoder \"%s\"",
+					VIDEO_H264_HW_ENCODER);
+		}
+		return codec;
+	case VIDEO_VP9:
+		codec = avcodec_find_encoder_by_name(VIDEO_VP9_HW_ENCODER);
+		if (!codec && print_error) {
+			wp_error("Failed to find encoder \"%s\"",
+					VIDEO_VP9_HW_ENCODER);
+		}
+		return codec;
+	case VIDEO_AV1:
+		return NULL;
+	default:
+		return NULL;
+	}
+}
+
+static const struct AVCodec *get_video_decoder(
+		enum video_coding_fmt fmt, bool print_error)
+{
+	const struct AVCodec *codec = NULL;
+	switch (fmt) {
+	case VIDEO_H264:
+		codec = avcodec_find_decoder_by_name(VIDEO_H264_DECODER);
+		if (!codec && print_error) {
+			wp_error("Failed to find decoder \"%s\"",
+					VIDEO_H264_DECODER);
+		}
+		return codec;
+	case VIDEO_VP9:
+		codec = avcodec_find_decoder_by_name(VIDEO_VP9_DECODER);
+		if (!codec && print_error) {
+			wp_error("Failed to find decoder \"%s\"",
+					VIDEO_VP9_DECODER);
+		}
+		return codec;
+	case VIDEO_AV1:
+		codec = avcodec_find_decoder_by_name(VIDEO_AV1_DECODER);
+		if (!codec && print_error) {
+			wp_error("Failed to find decoder \"%s\"",
+					VIDEO_AV1_DECODER);
+		}
+		return codec;
+	default:
+		return NULL;
+	}
+}
+
 bool video_supports_coding_format(enum video_coding_fmt fmt)
 {
-	const struct AVCodec *enc, *dec;
-	switch (fmt) {
-	case VIDEO_VP9:
-		enc = avcodec_find_encoder_by_name(VIDEO_VP9_SW_ENCODER);
-		dec = avcodec_find_decoder_by_name(VIDEO_VP9_DECODER);
-		return enc && dec;
-	case VIDEO_H264:
-		enc = avcodec_find_encoder_by_name(VIDEO_H264_SW_ENCODER);
-		dec = avcodec_find_decoder_by_name(VIDEO_H264_DECODER);
-		return enc && dec;
-	default:
-		return false;
-	}
+	return get_video_sw_encoder(fmt, false) &&
+	       get_video_decoder(fmt, false);
 }
 
 static void video_log_callback(
@@ -629,7 +719,7 @@ void cleanup_hwcontext(struct render_data *rd)
 }
 
 static void configure_low_latency_enc_context(struct AVCodecContext *ctx,
-		bool sw, enum video_coding_fmt fmt, int bpf)
+		bool sw, enum video_coding_fmt fmt, int bpf, int nthreads)
 {
 	// "time" is only meaningful in terms of the frames provided
 	int nom_fps = 25;
@@ -667,6 +757,22 @@ static void configure_low_latency_enc_context(struct AVCodecContext *ctx,
 			if (av_opt_set(ctx->priv_data, "speed", "8", 0) != 0) {
 				wp_error("Failed to set vp9 speed");
 			}
+		} else if (fmt == VIDEO_AV1) {
+			// AOM-AV1
+			if (av_opt_set(ctx->priv_data, "usage", "realtime",
+					    0) != 0) {
+				wp_error("Failed to set av1 usage");
+			}
+			if (av_opt_set(ctx->priv_data, "lag-in-frames", "0",
+					    0) != 0) {
+				wp_error("Failed to set av1 lag");
+			}
+			if (av_opt_set(ctx->priv_data, "cpu-used", "8", 0) !=
+					0) {
+				wp_error("Failed to set av1 speed");
+			}
+			// Use multi-threaded encoding
+			ctx->thread_count = nthreads;
 		}
 	} else {
 		ctx->bit_rate = bpf * nom_fps;
@@ -681,23 +787,21 @@ static void configure_low_latency_enc_context(struct AVCodecContext *ctx,
 	}
 }
 
-static int setup_hwvideo_encode(struct shadow_fd *sfd, struct render_data *rd)
+static int setup_hwvideo_encode(
+		struct shadow_fd *sfd, struct render_data *rd, int nthreads)
 {
 	/* NV12 is the preferred format for Intel VAAPI; see also
 	 * intel-vaapi-driver/src/i965_drv_video.c . Packed formats like
 	 * YUV420P typically don't work. */
 	const enum AVPixelFormat videofmt = AV_PIX_FMT_NV12;
-	const char *hw_encoder = sfd->video_fmt == VIDEO_H264
-						 ? VIDEO_H264_HW_ENCODER
-						 : VIDEO_VP9_HW_ENCODER;
-	const struct AVCodec *codec = avcodec_find_encoder_by_name(hw_encoder);
+	const struct AVCodec *codec =
+			get_video_hw_encoder(sfd->video_fmt, true);
 	if (!codec) {
-		wp_error("Failed to find encoder \"%s\"", hw_encoder);
 		return -1;
 	}
 	struct AVCodecContext *ctx = avcodec_alloc_context3(codec);
 	configure_low_latency_enc_context(
-			ctx, false, sfd->video_fmt, rd->av_bpf);
+			ctx, false, sfd->video_fmt, rd->av_bpf, nthreads);
 	if (!pad_hardware_size((int)sfd->dmabuf_info.width,
 			    (int)sfd->dmabuf_info.height, &ctx->width,
 			    &ctx->height)) {
@@ -850,7 +954,8 @@ fail_alignment:
 	return -1;
 }
 
-int setup_video_encode(struct shadow_fd *sfd, struct render_data *rd)
+int setup_video_encode(
+		struct shadow_fd *sfd, struct render_data *rd, int nthreads)
 {
 	if (sfd->video_context) {
 		wp_error("Video context already set up for sfd RID=%d",
@@ -861,7 +966,7 @@ int setup_video_encode(struct shadow_fd *sfd, struct render_data *rd)
 	bool has_hw = init_hwcontext(rd) == 0;
 	/* Attempt hardware encoding, and if it doesn't succeed, fall back
 	 * to software encoding */
-	if (has_hw && setup_hwvideo_encode(sfd, rd) == 0) {
+	if (has_hw && setup_hwvideo_encode(sfd, rd, nthreads) == 0) {
 		return 0;
 	}
 
@@ -882,19 +987,16 @@ int setup_video_encode(struct shadow_fd *sfd, struct render_data *rd)
 				av_get_pix_fmt_name(videofmt));
 		return -1;
 	}
-	const char *sw_encoder = sfd->video_fmt == VIDEO_H264
-						 ? VIDEO_H264_SW_ENCODER
-						 : VIDEO_VP9_SW_ENCODER;
-	const struct AVCodec *codec = avcodec_find_encoder_by_name(sw_encoder);
+	const struct AVCodec *codec =
+			get_video_sw_encoder(sfd->video_fmt, true);
 	if (!codec) {
-		wp_error("Failed to find encoder \"%s\"", sw_encoder);
 		return -1;
 	}
 
 	struct AVCodecContext *ctx = avcodec_alloc_context3(codec);
 	ctx->pix_fmt = videofmt;
 	configure_low_latency_enc_context(
-			ctx, true, sfd->video_fmt, rd->av_bpf);
+			ctx, true, sfd->video_fmt, rd->av_bpf, nthreads);
 
 	/* Increase image sizes as needed to ensure codec can run */
 	ctx->width = (int)sfd->dmabuf_info.width;
@@ -993,11 +1095,8 @@ int setup_video_decode(struct shadow_fd *sfd, struct render_data *rd)
 		return -1;
 	}
 
-	const char *decoder = sfd->video_fmt == VIDEO_H264 ? VIDEO_H264_DECODER
-							   : VIDEO_VP9_DECODER;
-	const struct AVCodec *codec = avcodec_find_decoder_by_name(decoder);
+	const struct AVCodec *codec = get_video_decoder(sfd->video_fmt, true);
 	if (!codec) {
-		wp_error("Failed to find decoder \"%s\"", decoder);
 		return -1;
 	}
 
@@ -1104,10 +1203,10 @@ void collect_video_from_mirror(
 	int recvstat = avcodec_receive_packet(
 			sfd->video_context, sfd->video_packet);
 	if (recvstat == AVERROR(EINVAL)) {
-		wp_error("Failed to receive packet");
+		wp_error("Failed to receive packet for RID=%d", sfd->remote_id);
 		return;
 	} else if (recvstat == AVERROR(EAGAIN)) {
-		wp_error("Packet needs more input");
+		wp_error("Packet for RID=%d needs more input", sfd->remote_id);
 	}
 	if (recvstat == 0) {
 		struct AVPacket *pkt = sfd->video_packet;

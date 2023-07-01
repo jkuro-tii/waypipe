@@ -955,8 +955,8 @@ void do_wl_keyboard_evt_keymap(
 		return;
 	}
 
-	struct shadow_fd *sfd = translate_fd(&ctx->g->map, &ctx->g->render, fd,
-			FDC_FILE, fdsz, NULL, false);
+	struct shadow_fd *sfd = translate_fd(&ctx->g->map, &ctx->g->render,
+			&ctx->g->threads, fd, FDC_FILE, fdsz, NULL, false);
 	if (!sfd) {
 		wp_error("Failed to create shadow for keymap fd=%d", fd);
 		return;
@@ -996,8 +996,8 @@ void do_wl_shm_req_create_pool(
 		return;
 	}
 
-	struct shadow_fd *sfd = translate_fd(&ctx->g->map, &ctx->g->render, fd,
-			FDC_FILE, fdsz, NULL, false);
+	struct shadow_fd *sfd = translate_fd(&ctx->g->map, &ctx->g->render,
+			&ctx->g->threads, fd, FDC_FILE, fdsz, NULL, false);
 	if (!sfd) {
 		return;
 	}
@@ -1248,7 +1248,7 @@ void do_wl_drm_req_create_prime_buffer(struct context *ctx,
 	};
 
 	struct shadow_fd *sfd = translate_fd(&ctx->g->map, &ctx->g->render,
-			name, FDC_DMABUF, 0, &info, false);
+			&ctx->g->threads, name, FDC_DMABUF, 0, &info, false);
 	if (!sfd) {
 		return;
 	}
@@ -1453,8 +1453,8 @@ void do_zwp_linux_buffer_params_v1_req_create(struct context *ctx,
 		/* note: the``info` provided includes the incoming/as-if stride
 		 * data. */
 		struct shadow_fd *sfd = translate_fd(&ctx->g->map,
-				&ctx->g->render, params->add[i].fd, res_type, 0,
-				&info, false);
+				&ctx->g->render, &ctx->g->threads,
+				params->add[i].fd, res_type, 0, &info, false);
 		if (!sfd) {
 			continue;
 		}
@@ -1664,8 +1664,8 @@ void do_zwp_linux_dmabuf_feedback_v1_evt_format_table(
 				fd, fdcat_to_str(fdtype), fdsz, size);
 		return;
 	}
-	struct shadow_fd *sfd = translate_fd(&ctx->g->map, &ctx->g->render, fd,
-			FDC_FILE, size, NULL, false);
+	struct shadow_fd *sfd = translate_fd(&ctx->g->map, &ctx->g->render,
+			&ctx->g->threads, fd, FDC_FILE, size, NULL, false);
 	if (!sfd) {
 		return;
 	}
@@ -1853,8 +1853,8 @@ void do_zwlr_export_dmabuf_frame_v1_evt_object(struct context *ctx,
 			.modifier = frame->modifier};
 	info.using_planes[index] = true;
 
-	struct shadow_fd *sfd = translate_fd(&ctx->g->map, &ctx->g->render, fd,
-			FDC_DMABUF, 0, &info, false);
+	struct shadow_fd *sfd = translate_fd(&ctx->g->map, &ctx->g->render,
+			&ctx->g->threads, fd, FDC_DMABUF, 0, &info, false);
 	if (!sfd) {
 		return;
 	}
@@ -1891,14 +1891,14 @@ void do_zwlr_export_dmabuf_frame_v1_evt_ready(struct context *ctx,
 		}
 	}
 }
-static void translate_data_transfer_fd(struct context *context, int32_t fd)
+static void translate_data_transfer_fd(struct context *ctx, int32_t fd)
 {
 	/* treat the fd as a one-way pipe, even if it is e.g. a file or
 	 * socketpair, with additional properties. The fd being sent
 	 * around should be, according to the protocol, only written into and
 	 * closed */
-	(void)translate_fd(&context->g->map, &context->g->render, fd, FDC_PIPE,
-			0, NULL, true);
+	(void)translate_fd(&ctx->g->map, &ctx->g->render, &ctx->g->threads, fd,
+			FDC_PIPE, 0, NULL, true);
 }
 void do_gtk_primary_selection_offer_req_receive(
 		struct context *ctx, const char *mime_type, int fd)
@@ -1964,8 +1964,8 @@ void do_zwlr_gamma_control_v1_req_set_gamma(struct context *ctx, int fd)
 				fdcat_to_str(fdtype));
 		return;
 	}
-	struct shadow_fd *sfd = translate_fd(&ctx->g->map, &ctx->g->render, fd,
-			FDC_FILE, fdsz, NULL, false);
+	struct shadow_fd *sfd = translate_fd(&ctx->g->map, &ctx->g->render,
+			&ctx->g->threads, fd, FDC_FILE, fdsz, NULL, false);
 	if (!sfd) {
 		return;
 	}

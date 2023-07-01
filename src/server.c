@@ -61,6 +61,7 @@ static inline uint32_t conntoken_header(const struct main_config *config,
 		header |= (config->video_fmt == VIDEO_H264 ? CONN_H264_VIDEO
 							   : 0);
 		header |= (config->video_fmt == VIDEO_VP9 ? CONN_VP9_VIDEO : 0);
+		header |= (config->video_fmt == VIDEO_AV1 ? CONN_AV1_VIDEO : 0);
 	} else {
 		header |= CONN_NO_VIDEO;
 	}

@@ -533,9 +533,9 @@ static void uncompress_buffer(struct thread_pool *pool, struct comp_ctx *ctx,
 }
 
 struct shadow_fd *translate_fd(struct fd_translation_map *map,
-		struct render_data *render, int fd, enum fdcat type,
-		size_t file_sz, const struct dmabuf_slice_data *info,
-		bool force_pipe_iw)
+		struct render_data *render, struct thread_pool *threads, int fd,
+		enum fdcat type, size_t file_sz,
+		const struct dmabuf_slice_data *info, bool force_pipe_iw)
 {
 	struct shadow_fd *sfd = get_shadow_for_local_fd(map, fd);
 	if (sfd) {
@@ -657,7 +657,7 @@ struct shadow_fd *translate_fd(struct fd_translation_map *map,
 		if (!sfd->dmabuf_bo) {
 			return sfd;
 		}
-		if (setup_video_encode(sfd, render) == -1) {
+		if (setup_video_encode(sfd, render, threads->nthreads) == -1) {
 			wp_error("Video encoding setup failed for RID=%d",
 					sfd->remote_id);
 		}
@@ -1698,14 +1698,14 @@ int apply_update(struct fd_translation_map *map, struct thread_pool *threads,
 					sizeof(struct dmabuf_slice_data));
 			uint32_t vid_type = header.vid_flags & 0xff;
 			if (vid_type == (uint32_t)VIDEO_H264 ||
-					vid_type == (uint32_t)VIDEO_VP9) {
+					vid_type == (uint32_t)VIDEO_VP9 ||
+					vid_type == (uint32_t)VIDEO_AV1) {
 				sfd->video_fmt =
 						(enum video_coding_fmt)vid_type;
 			} else {
-				sfd->video_fmt = VIDEO_H264;
 				wp_error("Unidentified video format %u for RID=%d",
 						vid_type, sfd->remote_id);
-				return 0;
+				return ERR_FATAL;
 			}
 		}
 
@@ -1768,14 +1768,14 @@ int apply_update(struct fd_translation_map *map, struct thread_pool *threads,
 					sizeof(struct dmabuf_slice_data));
 			uint32_t vid_type = header.vid_flags & 0xff;
 			if (vid_type == (uint32_t)VIDEO_H264 ||
-					vid_type == (uint32_t)VIDEO_VP9) {
+					vid_type == (uint32_t)VIDEO_VP9 ||
+					vid_type == (uint32_t)VIDEO_AV1) {
 				sfd->video_fmt =
 						(enum video_coding_fmt)vid_type;
 			} else {
-				sfd->video_fmt = VIDEO_H264;
 				wp_error("Unidentified video format %u for RID=%d",
 						sfd->remote_id);
-				return 0;
+				return ERR_FATAL;
 			}
 		}
 
@@ -1792,7 +1792,7 @@ int apply_update(struct fd_translation_map *map, struct thread_pool *threads,
 		}
 		sfd->fd_local = export_dmabuf(sfd->dmabuf_bo);
 
-		if (setup_video_encode(sfd, render) == -1) {
+		if (setup_video_encode(sfd, render, threads->nthreads) == -1) {
 			wp_error("Video encoding setup failed for RID=%d",
 					sfd->remote_id);
 		}
